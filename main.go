@@ -15,13 +15,13 @@ import (
 )
 
 type Status struct {
-	Load1    float64 `json:"load1,omitempty"`
-	Load5    float64 `json:"load5,omitempty"`
-	Load15   float64 `json:"load15,omitempty"`
+	Load1    float64 `json:"load1"`
+	Load5    float64 `json:"load5"`
+	Load15   float64 `json:"load15"`
 	NetBpsTx uint64  `json:"net-bps-tx"`
 	NetBpsRx uint64  `json:"net-bps-rx"`
-	Time     int64   `json:"time,omitempty"`
-	Uptime   int     `json:"uptime,omitempty"`
+	Time     int64   `json:"time"`
+	Uptime   int     `json:"uptime"`
 	sync.RWMutex
 }
 
@@ -29,23 +29,27 @@ var (
 	listenHostFlag     = flag.String("listen-host", "127.0.0.1", "Listen host")
 	listenPortFlag     = flag.Int("listen-port", 8080, "Listen port")
 	interfaceStatsFlag = flag.String("interface-stats", "all", "Network interface to read stats from")
+	intervalFlag       = flag.Int("interval", 1, "Data gather interval in seconds")
 	startTime          time.Time
 	status             Status
 )
 
 func main() {
 	flag.Parse()
+	if *intervalFlag < 1 {
+		fmt.Println("Interval must be higher than 0")
+	}
 	startTime = time.Now()
-	go status.Worker(*interfaceStatsFlag)
+	go status.Worker(*interfaceStatsFlag, *intervalFlag)
 
 	log := log.New(os.Stdout, "- ", log.LstdFlags)
-	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(assetFS())))
+	http.HandleFunc("/status", handler)
+	http.Handle("/", http.StripPrefix("/", http.FileServer(assetFS())))
 
-	http.HandleFunc("/", handler)
 	log.Fatal(http.ListenAndServe(*listenHostFlag+":"+strconv.Itoa(*listenPortFlag), nil))
 }
 
-func (s *Status) Worker(iface string) {
+func (s *Status) Worker(iface string, interval int) {
 	var prevBytesSent uint64
 	var prevBytesRecv uint64
 	for {
@@ -68,10 +72,10 @@ func (s *Status) Worker(iface string) {
 		for _, nic := range nics {
 			if iface == nic.Name {
 				if prevBytesSent > 0 {
-					netBpsTx = nic.BytesSent - prevBytesSent
+					netBpsTx = (nic.BytesSent - prevBytesSent) / uint64(interval)
 				}
 				if prevBytesSent > 0 {
-					netBpsRx = nic.BytesRecv - prevBytesRecv
+					netBpsRx = (nic.BytesRecv - prevBytesRecv) / uint64(interval)
 				}
 				prevBytesSent = nic.BytesSent
 				prevBytesRecv = nic.BytesRecv
@@ -99,7 +103,7 @@ func (s *Status) Worker(iface string) {
 		s.NetBpsRx = netBpsRx
 		s.Unlock()
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(time.Duration(interval) * time.Second)
 	}
 }
 

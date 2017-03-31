@@ -23,6 +23,7 @@ bin/nodestatus-darwin-amd64
 Parameters:
 
 * ``--interface-stats string``: Network interface to read stats from (default "all")
+* ``--interval int``: Data gather interval in seconds (default 1)
 * ``--listen-host string``: Listen host (default "127.0.0.1")
 * ``--listen-port int``: Listen port (default 8080)
 
