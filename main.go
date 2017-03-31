@@ -22,6 +22,7 @@ type Status struct {
 	NetBpsRx uint64  `json:"net-bps-rx"`
 	Time     int64   `json:"time"`
 	Uptime   int     `json:"uptime"`
+	Hostname string  `json:"hostname"`
 	sync.RWMutex
 }
 
@@ -89,6 +90,13 @@ func (s *Status) Worker(iface string, interval int) {
 			break
 		}
 
+		// Hostname
+		hostname, err := os.Hostname()
+		if err != nil {
+			fmt.Println("Unable to read hostname.")
+			break
+		}
+
 		// Time
 		now := time.Now()
 
@@ -98,7 +106,7 @@ func (s *Status) Worker(iface string, interval int) {
 		s.Load1 = l.Load1
 		s.Load5 = l.Load5
 		s.Load15 = l.Load15
-
+		s.Hostname = hostname
 		s.NetBpsTx = netBpsTx
 		s.NetBpsRx = netBpsRx
 		s.Unlock()
