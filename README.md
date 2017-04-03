@@ -45,7 +45,7 @@ Content-Length: 149
     "net-bps-rx": 8614,
     "time": 1490967626,
     "uptime": 5,
-    ""hostname": "somehost.varnish-software.com"
+    "hostname": "somehost.varnish-software.com"
 }
 ```
 
