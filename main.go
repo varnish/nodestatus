@@ -36,6 +36,13 @@ var (
 )
 
 func main() {
+	Intercept := func(h http.Handler) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "max-age=1")
+			h.ServeHTTP(w, r)
+		}
+	}
+
 	flag.Parse()
 	if *intervalFlag < 1 {
 		fmt.Println("Interval must be higher than 0")
@@ -44,8 +51,8 @@ func main() {
 	go status.Worker(*interfaceStatsFlag, *intervalFlag)
 
 	log := log.New(os.Stdout, "- ", log.LstdFlags)
-	http.HandleFunc("/status", handler)
-	http.Handle("/", http.StripPrefix("/", http.FileServer(assetFS())))
+	http.HandleFunc("/status", statusHandler)
+	http.Handle("/", Intercept(http.StripPrefix("/", http.FileServer(assetFS()))))
 
 	log.Fatal(http.ListenAndServe(*listenHostFlag+":"+strconv.Itoa(*listenPortFlag), nil))
 }
@@ -115,7 +122,7 @@ func (s *Status) Worker(iface string, interval int) {
 	}
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
+func statusHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "max-age=1")
 
