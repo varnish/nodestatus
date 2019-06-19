@@ -25,8 +25,8 @@ Parameters:
 * ``--listen-host string``: Listen host (default "127.0.0.1")
 * ``--listen-port int``: Listen port (default 8080)
 * ``--interval int``: Number of seconds to use as interval for averages (default 1)
-* ``--net-dev string``: Network interface to read stats from (default "all")
-* ``--net-threshold int``: Data gather interval in seconds (default 1)
+* ``--net-dev string``: Network interface to read stats from, examples are "eth0" or "bond0" or "all" to show all network interfaces combined (default "all")
+* ``--net-threshold int``: Data gather interval in seconds, examples are "1000", "10 Kbps", "4.5 Gbps" and "0.3 Tbps" (default "800 Mbps")
 * ``--maintenance string``: Path to a file in the file system which indicates maintenance mode (default /etc/varnish/maintenance)
 
 Example output:
@@ -54,5 +54,8 @@ Content-Length: 266
 }
 ```
 
-By default it shows the network stats (bit per second) all network interfaces combined. Using the ``--net-dev`` parameter it is possible to specify a specific interface, for example ``eth0`` or ``bond0``.
+Explanation:
+
+* ``free: true`` means that the node has available resources to handle more clients.
+* The current transfer rate (99 Mbps) is at 9% (net-utilization) of the threshold (1 Gbps).
 
