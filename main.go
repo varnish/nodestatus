@@ -38,7 +38,7 @@ var (
 func main() {
 	Intercept := func(h http.Handler) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Cache-Control", "max-age=1")
+			w.Header().Set("Cache-Control", "max-age=1, stale-while-revalidate=1")
 			h.ServeHTTP(w, r)
 		}
 	}
@@ -124,7 +124,7 @@ func (s *Status) Worker(iface string, interval int) {
 
 func statusHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "max-age=1")
+	w.Header().Set("Cache-Control", "max-age=1, stale-while-revalidate=1")
 
 	status.Lock()
 	if out, err := json.MarshalIndent(status, "", "    "); err != nil {
