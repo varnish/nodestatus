@@ -4,8 +4,6 @@ After=network.target
 
 [Service]
 ExecStart=/usr/bin/nodestatus
-StandardOutput=syslog
-StandardError=syslog
 SyslogIdentifier=nodestatus
 PrivateTmp=true
 User=status
