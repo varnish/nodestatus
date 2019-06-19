@@ -34,11 +34,11 @@ var (
 	maintenanceFilePathFlag = flag.String("maintenance", "/etc/varnish/maintenance", "File in the file system indicating maintenance mode")
 	listenHostFlag          = flag.String("listen-host", "127.0.0.1", "Listen host")
 	listenPortFlag          = flag.Int("listen-port", 8080, "Listen port")
-	netThresholdFlag            = flag.String("net-threshold", "800 Mbps", "Network bandwidth threshold (units bps, Kbps, Mbps, Gbps and Tbps)")
+	netThresholdFlag        = flag.String("net-threshold", "800 Mbps", "Network bandwidth threshold (units bps, Kbps, Mbps, Gbps and Tbps)")
 	netDeviceFlag           = flag.String("net-dev", "all", "Network interface to read stats from")
 	intervalFlag            = flag.Int("interval", 1, "Data gather interval in seconds")
-	status                 Status
-	netThreshold           uint64
+	status                  Status
+	netThreshold            uint64
 )
 
 func main() {
