@@ -22,35 +22,37 @@ bin/nodestatus-darwin-amd64
 
 Parameters:
 
-* ``--interface-stats string``: Network interface to read stats from (default "all")
-* ``--interval int``: Data gather interval in seconds (default 1)
 * ``--listen-host string``: Listen host (default "127.0.0.1")
 * ``--listen-port int``: Listen port (default 8080)
+* ``--interval int``: Number of seconds to use as interval for averages (default 1)
+* ``--net-dev string``: Network interface to read stats from (default "all")
+* ``--net-threshold int``: Data gather interval in seconds (default 1)
+* ``--maintenance string``: Path to a file in the file system which indicates maintenance mode (default /etc/varnish/maintenance)
 
 Example output:
 
 ```
-$ curl -i http://localhost:8080/
+$ curl -i http://localhost:8080
 HTTP/1.1 200 OK
-Cache-Control: max-age=1
+Cache-Control: max-age=1, stale-while-revalidate=1
 Content-Type: application/json
-Date: Fri, 31 Mar 2017 13:40:26 GMT
-Content-Length: 149
+Date: Wed, 19 Jun 2019 11:44:15 GMT
+Content-Length: 266
 
 {
-    "load1": 1.56,
-    "load5": 2.09,
-    "load15": 2.07,
-    "net-bps-tx": 7421,
-    "net-bps-rx": 8614,
-    "time": 1490967626,
-    "uptime": 5,
-    "hostname": "somehost.varnish-software.com"
+    "free": true,
+    "reason": "Normal operation",
+    "load1": 2.15,
+    "load5": 1.83,
+    "load15": 1.72,
+    "net": "99 Mbps",
+    "net-threshold": "1.0 Gbps",
+    "net-utilization": 9,
+    "time": 1560944655,
+    "uptime": 2,
+    "hostname": "work-2.local"
 }
 ```
 
-By default it shows the network stats (bytes {in,out} per second) all network interfaces combined. Using the ``--interface-stats`` parameter it is possible to specify a specific interface, for example ``eth0`` or ``bond0``.
+By default it shows the network stats (bit per second) all network interfaces combined. Using the ``--net-dev`` parameter it is possible to specify a specific interface, for example ``eth0`` or ``bond0``.
 
-## Static content
-
-A small gif is served from ``/static/r20.gif``, which can be used by Cedexis for measurements.
