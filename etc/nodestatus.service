@@ -3,7 +3,7 @@ Description=Nodestatus
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/nodestatus
+ExecStart=/usr/bin/nodestatus --listen-host localhost --listen-port 8080 --maintenance /etc/varnish/maintenance --net-dev all --net-threshold "1 Gbps"
 SyslogIdentifier=nodestatus
 PrivateTmp=true
 User=status
