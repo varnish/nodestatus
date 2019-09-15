@@ -5,12 +5,10 @@ Lightweight web service with a built in web server to print node status.
 ## Installation
 
 ```
-go get github.com/varnish/nodestatus
-make deps
+git clone github.com/varnish/nodestatus
+cd nodestatus
 make build
 ```
-
-``$GOPATH/bin`` has to be in path for ``make build`` to succeed.
 
 ## Running
 
