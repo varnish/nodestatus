@@ -23,6 +23,7 @@ var (
 	pusherUrl      = flag.String("pusher-url", "https://example.com/", "URL to push metrics")
 	pusherUsername = flag.String("pusher-username", "", "Username to use when pushing metrics")
 	pusherSecret   = flag.String("pusher-secret", "", "Secret to use when pushing metrics")
+	pusherEnable   = flag.Bool("pusher-enable", false, "Enable metrics push")
 )
 
 type NodeStatus struct {
@@ -87,7 +88,7 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 
 	for {
 		sleep := time.Duration(*pullerInterval+rand.Intn(100)) * time.Millisecond
-		log.Println("Puller for "+node.Name+" sleeping in", sleep.String())
+		//log.Println("Puller for "+node.Name+" sleeping in", sleep.String())
 		time.Sleep(sleep)
 
 		t0 := time.Now()
@@ -150,7 +151,7 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 
 	for {
 		sleep := time.Duration(*pusherInterval+rand.Intn(100)) * time.Millisecond
-		log.Println("Pusher sleeping in", sleep.String())
+		//log.Println("Pusher sleeping in", sleep.String())
 		time.Sleep(sleep)
 
 		var all []NodeStatus
@@ -182,18 +183,20 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 			log.Println("Pusher error:", err)
 			continue
 		}
-		elapsed := time.Since(t0).Seconds()
-		log.Println("Pusher completed in", elapsed)
 		if resp.StatusCode != http.StatusOK {
-			log.Println("Invalid response code:", resp.StatusCode)
+			log.Println("Pusher error, got invalid response code:", resp.StatusCode)
 			continue
 		}
 
 		if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
 			log.Println("Pusher error:", err)
+			continue
 		}
 
 		defer resp.Body.Close()
+
+		elapsed := time.Since(t0).Seconds()
+		log.Println("Pusher completed in", elapsed)
 	}
 }
 
@@ -213,5 +216,10 @@ func main() {
 		go StatusPuller(node, status)
 	}
 
-	StatusPusher(nodes, status)
+	if *pusherEnable {
+		go StatusPusher(nodes, status)
+	}
+
+	// Block here
+	select {}
 }
