@@ -20,10 +20,11 @@ import (
 var (
 	pullerInterval = flag.Int("puller-interval", 1000, "Interval in milliseconds to pull metrics")
 	pusherInterval = flag.Int("pusher-interval", 1000, "Interval in milliseconds to push metrics")
+	pusherEnable   = flag.Bool("pusher-enable", false, "Enable metrics push")
 	pusherUrl      = flag.String("pusher-url", "https://example.com/", "URL to push metrics")
+	pusherAuth     = flag.String("pusher-auth", "basic", "Authentication machanism to use when pushing metrics")
 	pusherUsername = flag.String("pusher-username", "", "Username to use when pushing metrics")
 	pusherSecret   = flag.String("pusher-secret", "", "Secret to use when pushing metrics")
-	pusherEnable   = flag.Bool("pusher-enable", false, "Enable metrics push")
 )
 
 type NodeStatus struct {
@@ -175,9 +176,12 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 			continue
 		}
 		req.Header.Set("User-Agent", "NodeStatusPusher/1.0.0")
-		if *pusherUsername != "" || *pusherSecret != "" {
+		if *pusherAuth == "basic" {
 			req.SetBasicAuth(*pusherUsername, *pusherSecret)
+		} else if *pusherAuth == "bearer" {
+			req.Header.Set("Authorization", "Bearer "+*pusherSecret)
 		}
+
 		resp, err := client.Do(req)
 		if err != nil {
 			log.Println("Pusher error:", err)
