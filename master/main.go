@@ -30,10 +30,9 @@ var (
 	pusherPassword = flag.String("pusher-password", "", "Basic auth password to use when pushing metrics")
 
 	// OAuth2
-	pusherClientId       = flag.String("pusher-client-id", "", "OAuth client id to use when pushing metrics")
-	pusherClientSecret   = flag.String("pusher-client-secret", "", "OAuth client secret to use when pushing metrics")
-	pusherKeyExchangeUrl = flag.String("pusher-key-exchange-url", "", "OAuth URL to for key exchange when pushing metrics")
-	pusherScope          = flag.String("pusher-scope", "", "OAuth scope to ask for during key exchange when pushing metrics")
+	pusherClientId     = flag.String("pusher-client-id", "", "OAuth client id to use when pushing metrics")
+	pusherClientSecret = flag.String("pusher-client-secret", "", "OAuth client secret to use when pushing metrics")
+	pusherTokenUrl     = flag.String("pusher-token-url", "", "OAuth URL to get token when pushing metrics")
 )
 
 type NodeStatus struct {
@@ -179,7 +178,7 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 		conf := clientcredentials.Config{
 			ClientID:     *pusherClientId,
 			ClientSecret: *pusherClientSecret,
-			TokenURL:     *pusherKeyExchangeUrl,
+			TokenURL:     *pusherTokenUrl,
 		}
 		client = conf.Client(context.Background())
 	}
