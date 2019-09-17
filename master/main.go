@@ -18,12 +18,14 @@ import (
 )
 
 var (
-	pullerInterval = flag.Duration("puller-interval", 1*time.Second, "Interval used to pull metrics")
-	pusherInterval = flag.Duration("pusher-interval", 1*time.Second, "Interval used to push metrics")
-	pusherEnable   = flag.Bool("pusher-enable", false, "Enable metrics push")
-	pusherUrl      = flag.String("pusher-url", "https://example.com/", "URL to push metrics")
+	debug = flag.Bool("debug", false, "Enable debug output")
 
-	pusherAuth = flag.String("pusher-auth", "basic", "Authentication machanism to use when pushing metrics")
+	pullerInterval = flag.Duration("puller-interval", 1*time.Second, "Interval used to pull metrics")
+
+	pusherEnable   = flag.Bool("pusher-enable", false, "Enable metrics push")
+	pusherInterval = flag.Duration("pusher-interval", 1*time.Second, "Interval used to push metrics")
+	pusherUrl      = flag.String("pusher-url", "https://example.com/", "URL to push metrics")
+	pusherAuth     = flag.String("pusher-auth", "basic", "Authentication machanism to use when pushing metrics [basic, oauth]")
 
 	// Basic auth
 	pusherUsername = flag.String("pusher-username", "", "Basic auth username to use when pushing metrics")
@@ -48,6 +50,17 @@ type NodeStatus struct {
 	Uptime         int     `json:"uptime,omitempty"`
 	Name           string  `json:"name"`
 	Hostname       string  `json:"hostname,omitempty"`
+}
+
+// Reset the nodestatus values, for example useful on connection failures.
+func (s *NodeStatus) Reset() {
+	s.Free = false
+	s.Reason = ""
+	s.Load1 = 0
+	s.Load5 = 0
+	s.Load15 = 0
+	s.Net = ""
+	s.NetUtilization = 0
 }
 
 type NodeConfig struct {
@@ -103,6 +116,7 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 		req, err := http.NewRequest(http.MethodGet, node.Url, nil)
 		if err != nil {
 			log.Println("Puller for "+node.Name+" error:", err)
+			s.Reset()
 			s.Reason = "Unable to create request"
 			status.Store(node.Name, s)
 			continue
@@ -111,12 +125,17 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 		resp, err := client.Do(req)
 		if err != nil {
 			log.Println("Puller for "+node.Name+" error:", err)
+			s.Reset()
 			s.Reason = "Unable to connect to node"
 			status.Store(node.Name, s)
 			continue
 		}
-		if resp.StatusCode != http.StatusOK {
-			s.Reason = "Invalid response code"
+		if *debug {
+			log.Println("Puller for " + node.Name + " completed with status " + resp.Status)
+		}
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusServiceUnavailable {
+			s.Reset()
+			s.Reason = "Invalid response code (" + resp.Status + ")"
 			status.Store(node.Name, s)
 			continue
 		}
@@ -124,19 +143,23 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			log.Println("Puller for "+node.Name+" error:", err)
-			s.Reason = "Invalid response code"
+			s.Reset()
+			s.Reason = "Unable to read response body"
 			status.Store(node.Name, s)
 			continue
 		}
 
 		elapsed := time.Since(t0).Seconds()
 		log.Printf("Puller for %s fetched %db in %.2fs\n", node.Name, len(body), elapsed)
-
 		if err := json.Unmarshal(body, &s); err != nil {
 			log.Println("Puller for "+node.Name+" error:", err)
+			s.Reset()
 			s.Reason = "Unable to read status"
 			status.Store(node.Name, s)
 			continue
+		}
+		if *debug {
+			log.Println("Puller for " + node.Name + " got: " + string(body))
 		}
 		status.Store(node.Name, s)
 	}
@@ -183,7 +206,9 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 			log.Println(err)
 			continue
 		}
-		//log.Println(string(out))
+		if *debug {
+			log.Println("Pusher will send " + string(out))
+		}
 
 		t0 := time.Now()
 		req, err := http.NewRequest(http.MethodPost, *pusherUrl, bytes.NewBuffer(out))
@@ -202,6 +227,10 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 		if err != nil {
 			log.Println("Pusher error:", err)
 			continue
+		}
+
+		if *debug {
+			log.Println("Pusher completed with status " + resp.Status)
 		}
 
 		if resp.StatusCode == 429 {
