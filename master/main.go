@@ -2,7 +2,11 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"flag"
+	"golang.org/x/oauth2/clientcredentials"
+	"gopkg.in/ini.v1"
 	"io"
 	"io/ioutil"
 	"log"
@@ -10,10 +14,6 @@ import (
 	"net"
 	"net/http"
 	"sync"
-	//"os"
-	//"strings"
-	"encoding/json"
-	"gopkg.in/ini.v1"
 	"time"
 )
 
@@ -22,9 +22,18 @@ var (
 	pusherInterval = flag.Duration("pusher-interval", 1*time.Second, "Interval used to push metrics")
 	pusherEnable   = flag.Bool("pusher-enable", false, "Enable metrics push")
 	pusherUrl      = flag.String("pusher-url", "https://example.com/", "URL to push metrics")
-	pusherAuth     = flag.String("pusher-auth", "basic", "Authentication machanism to use when pushing metrics")
-	pusherUsername = flag.String("pusher-username", "", "Username to use when pushing metrics")
-	pusherSecret   = flag.String("pusher-secret", "", "Secret to use when pushing metrics")
+
+	pusherAuth = flag.String("pusher-auth", "basic", "Authentication machanism to use when pushing metrics")
+
+	// Basic auth
+	pusherUsername = flag.String("pusher-username", "", "Basic auth username to use when pushing metrics")
+	pusherPassword = flag.String("pusher-password", "", "Basic auth password to use when pushing metrics")
+
+	// OAuth2
+	pusherClientId       = flag.String("pusher-client-id", "", "OAuth client id to use when pushing metrics")
+	pusherClientSecret   = flag.String("pusher-client-secret", "", "OAuth client secret to use when pushing metrics")
+	pusherKeyExchangeUrl = flag.String("pusher-key-exchange-url", "", "OAuth URL to for key exchange when pushing metrics")
+	pusherScope          = flag.String("pusher-scope", "", "OAuth scope to ask for during key exchange when pushing metrics")
 )
 
 type NodeStatus struct {
@@ -78,7 +87,7 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 		DisableCompression:  false,
 	}
 	client := &http.Client{
-		Timeout:   2 * time.Second,
+		Timeout:   3 * time.Second,
 		Transport: tr,
 	}
 
@@ -135,6 +144,21 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 	}
 }
 
+type OAuthClient struct {
+	*http.Client
+}
+
+func NewOAuthClient(clientId string, clientSecret string, tokenUrl string) *OAuthClient {
+	conf := clientcredentials.Config{
+		ClientID:     clientId,
+		ClientSecret: clientSecret,
+		TokenURL:     tokenUrl,
+	}
+	ctx := context.Background()
+	client := conf.Client(ctx)
+	return &OAuthClient{client}
+}
+
 func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 	tr := &http.Transport{
 		DialContext: (&net.Dialer{
@@ -149,6 +173,15 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 	client := &http.Client{
 		Timeout:   5 * time.Second,
 		Transport: tr,
+	}
+
+	if *pusherAuth == "oauth" {
+		conf := clientcredentials.Config{
+			ClientID:     *pusherClientId,
+			ClientSecret: *pusherClientSecret,
+			TokenURL:     *pusherKeyExchangeUrl,
+		}
+		client = conf.Client(context.Background())
 	}
 
 	for {
@@ -180,9 +213,7 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 		req.Header.Set("Content-Type", "application/json")
 
 		if *pusherAuth == "basic" {
-			req.SetBasicAuth(*pusherUsername, *pusherSecret)
-		} else if *pusherAuth == "bearer" {
-			req.Header.Set("Authorization", "Bearer "+*pusherSecret)
+			req.SetBasicAuth(*pusherUsername, *pusherPassword)
 		}
 
 		resp, err := client.Do(req)
@@ -190,6 +221,13 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 			log.Println("Pusher error:", err)
 			continue
 		}
+
+		if resp.StatusCode == 429 {
+			log.Println("Pusher was rate limited. Sleeping for 15 seconds")
+			time.Sleep(15 * time.Second)
+			continue
+		}
+
 		if resp.StatusCode != http.StatusOK {
 			log.Println("Pusher error, got invalid response code:", resp.StatusCode)
 			continue
