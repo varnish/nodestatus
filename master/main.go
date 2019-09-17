@@ -97,7 +97,6 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 
 	for {
 		sleep := *pullerInterval + time.Duration(rand.Intn(100))*time.Millisecond
-		//log.Println("Puller for "+node.Name+" sleeping in", sleep.String())
 		time.Sleep(sleep)
 
 		t0 := time.Now()
@@ -143,21 +142,6 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 	}
 }
 
-type OAuthClient struct {
-	*http.Client
-}
-
-func NewOAuthClient(clientId string, clientSecret string, tokenUrl string) *OAuthClient {
-	conf := clientcredentials.Config{
-		ClientID:     clientId,
-		ClientSecret: clientSecret,
-		TokenURL:     tokenUrl,
-	}
-	ctx := context.Background()
-	client := conf.Client(ctx)
-	return &OAuthClient{client}
-}
-
 func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 	tr := &http.Transport{
 		DialContext: (&net.Dialer{
@@ -185,7 +169,6 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 
 	for {
 		sleep := *pullerInterval + time.Duration(rand.Intn(100))*time.Millisecond
-		//log.Println("Pusher sleeping in", sleep.String())
 		time.Sleep(sleep)
 
 		var all []NodeStatus
