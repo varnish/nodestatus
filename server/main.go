@@ -1,13 +1,16 @@
 package main
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -59,7 +62,7 @@ func main() {
 	// Goroutine to collect metrics and calculate utilization
 	go status.Worker(*netDeviceFlag, *intervalFlag)
 
-	http.HandleFunc("/", statusHandler)
+	http.HandleFunc("/", gzipHandler(statusHandler))
 
 	log.Println("Listening at " + *listenHostFlag + ":" + strconv.Itoa(*listenPortFlag))
 	log.Fatal(http.ListenAndServe(*listenHostFlag+":"+strconv.Itoa(*listenPortFlag), nil))
@@ -167,6 +170,29 @@ func (s *Status) Worker(iface string, interval int) {
 		s.Unlock()
 
 		time.Sleep(time.Duration(interval) * time.Second)
+	}
+}
+
+type gzipResponseWriter struct {
+	io.Writer
+	http.ResponseWriter
+}
+
+func (w gzipResponseWriter) Write(b []byte) (int, error) {
+	return w.Writer.Write(b)
+}
+
+func gzipHandler(fn http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			fn(w, r)
+			return
+		}
+		w.Header().Set("Content-Encoding", "gzip")
+		gz := gzip.NewWriter(w)
+		defer gz.Close()
+		gzr := gzipResponseWriter{Writer: gz, ResponseWriter: w}
+		fn(gzr, r)
 	}
 }
 
