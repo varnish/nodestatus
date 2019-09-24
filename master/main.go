@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"flag"
@@ -122,6 +123,7 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 			continue
 		}
 		req.Header.Set("User-Agent", "NodeStatusPuller/1.0.0")
+		req.Header.Set("Accept-Encoding", "gzip")
 		resp, err := client.Do(req)
 		if err != nil {
 			log.Println("Puller for "+node.Name+" error:", err)
@@ -130,6 +132,8 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 			status.Store(node.Name, s)
 			continue
 		}
+		defer resp.Body.Close()
+
 		if *debug {
 			log.Println("Puller for " + node.Name + " completed with status " + resp.Status)
 		}
@@ -140,7 +144,23 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 			continue
 		}
 
-		body, err := ioutil.ReadAll(resp.Body)
+		var reader io.ReadCloser
+		switch resp.Header.Get("Content-Encoding") {
+		case "gzip":
+			reader, err = gzip.NewReader(resp.Body)
+			if err != nil {
+				log.Println("Puller for "+node.Name+" failed to uncompress response:", err)
+				s.Reset()
+				s.Reason = "Invalid response code (" + resp.Status + ")"
+				status.Store(node.Name, s)
+				continue
+			}
+			defer reader.Close()
+		default:
+			reader = resp.Body
+		}
+
+		body, err := ioutil.ReadAll(reader)
 		if err != nil {
 			log.Println("Puller for "+node.Name+" error:", err)
 			s.Reset()
@@ -218,6 +238,7 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 		}
 		req.Header.Set("User-Agent", "NodeStatusPusher/1.0.0")
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept-Encoding", "gzip")
 
 		if *pusherAuth == "basic" {
 			req.SetBasicAuth(*pusherUsername, *pusherPassword)
@@ -228,6 +249,7 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 			log.Println("Pusher error:", err)
 			continue
 		}
+		defer resp.Body.Close()
 
 		if *debug {
 			log.Println("Pusher completed with status " + resp.Status)
@@ -248,8 +270,6 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 			log.Println("Pusher error:", err)
 			continue
 		}
-
-		defer resp.Body.Close()
 
 		elapsed := time.Since(t0).Seconds()
 		log.Printf("Pusher sent %db in %.2fs", len(out), elapsed)
