@@ -1,0 +1,13 @@
+[Unit]
+Description=Nodestatus Master
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/nodestatus-master --config /etc/nodestatus/nodes.ini --puller-interval 5s --pusher-enable --pusher-interval 5s --pusher-url https://loadbalancer.example.com/
+SyslogIdentifier=nodestatus
+PrivateTmp=true
+User=status
+Group=status
+
+[Install]
+WantedBy=multi-user.target
