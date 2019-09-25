@@ -14,28 +14,29 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 )
 
 var (
-	debug = flag.Bool("debug", false, "Enable debug output")
+	debug = flag.Bool("debug", false, "Enable debug output.")
 
-	pullerInterval = flag.Duration("puller-interval", 1*time.Second, "Interval used to pull metrics")
+	pullerInterval = flag.Duration("puller-interval", 1*time.Second, "Interval used to pull metrics.")
 
-	pusherEnable   = flag.Bool("pusher-enable", false, "Enable metrics push")
-	pusherInterval = flag.Duration("pusher-interval", 1*time.Second, "Interval used to push metrics")
-	pusherUrl      = flag.String("pusher-url", "https://example.com/", "URL to push metrics")
-	pusherAuth     = flag.String("pusher-auth", "basic", "Authentication machanism to use when pushing metrics [basic, oauth]")
+	pusherEnable   = flag.Bool("pusher-enable", false, "Enable metrics push.")
+	pusherInterval = flag.Duration("pusher-interval", 1*time.Second, "Interval used to push metrics.")
+	pusherUrl      = flag.String("pusher-url", "https://example.com/", "URL to push metrics.")
+	pusherAuth     = flag.String("pusher-auth", "basic", "Authentication machanism to use when pushing metrics [basic, oauth].")
 
 	// Basic auth
-	pusherUsername = flag.String("pusher-username", "", "Basic auth username to use when pushing metrics")
-	pusherPassword = flag.String("pusher-password", "", "Basic auth password to use when pushing metrics")
+	pusherUsername = flag.String("pusher-username", os.Getenv("AUTH_USERNAME"), "Basic auth username to use when pushing metrics. The default value is read from the environment variable AUTH_USERNAME.")
+	pusherPassword = flag.String("pusher-password", os.Getenv("AUTH_PASSWORD"), "Basic auth password to use when pushing metrics. The default value is read from the environment variable AUTH_PASSWORD.")
 
 	// OAuth2
-	pusherClientId     = flag.String("pusher-client-id", "", "OAuth client id to use when pushing metrics")
-	pusherClientSecret = flag.String("pusher-client-secret", "", "OAuth client secret to use when pushing metrics")
-	pusherTokenUrl     = flag.String("pusher-token-url", "", "OAuth URL to get token when pushing metrics")
+	pusherClientId     = flag.String("pusher-client-id", os.Getenv("OAUTH_CLIENT_ID"), "OAuth client id to use when pushing metrics. The default value is read from the environment variable OAUTH_CLIENT_ID.")
+	pusherClientSecret = flag.String("pusher-client-secret", os.Getenv("OAUTH_CLIENT_SECRET"), "OAuth client secret to use when pushing metrics. The default value is read from the environment variable OAUTH_CLIENT_SECRET.")
+	pusherTokenUrl     = flag.String("pusher-token-url", os.Getenv("OAUTH_TOKEN_URL"), "OAuth URL to get token when pushing metrics. The default value is read from the environment variable OAUTH_TOKEN_URL.")
 )
 
 type NodeStatus struct {
@@ -132,7 +133,6 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 			status.Store(node.Name, s)
 			continue
 		}
-		defer resp.Body.Close()
 
 		if *debug {
 			log.Println("Puller for " + node.Name + " completed with status " + resp.Status)
@@ -141,6 +141,7 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 			s.Reset()
 			s.Reason = "Invalid response code (" + resp.Status + ")"
 			status.Store(node.Name, s)
+			resp.Body.Close()
 			continue
 		}
 
@@ -153,9 +154,9 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 				s.Reset()
 				s.Reason = "Invalid response code (" + resp.Status + ")"
 				status.Store(node.Name, s)
+				resp.Body.Close()
 				continue
 			}
-			defer reader.Close()
 		default:
 			reader = resp.Body
 		}
@@ -166,8 +167,10 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 			s.Reset()
 			s.Reason = "Unable to read response body"
 			status.Store(node.Name, s)
+			reader.Close()
 			continue
 		}
+		reader.Close()
 
 		elapsed := time.Since(t0).Seconds()
 		log.Printf("Puller for %s fetched %db in %.2fs\n", node.Name, len(body), elapsed)
@@ -249,7 +252,6 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 			log.Println("Pusher error:", err)
 			continue
 		}
-		defer resp.Body.Close()
 
 		if *debug {
 			log.Println("Pusher completed with status " + resp.Status)
@@ -258,18 +260,22 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 		if resp.StatusCode == 429 {
 			log.Println("Pusher was rate limited. Sleeping for 15 seconds")
 			time.Sleep(15 * time.Second)
+			resp.Body.Close()
 			continue
 		}
 
 		if resp.StatusCode != http.StatusOK {
 			log.Println("Pusher error, got invalid response code:", resp.StatusCode)
+			resp.Body.Close()
 			continue
 		}
 
 		if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
 			log.Println("Pusher error:", err)
+			resp.Body.Close()
 			continue
 		}
+		resp.Body.Close()
 
 		elapsed := time.Since(t0).Seconds()
 		log.Printf("Pusher sent %db in %.2fs", len(out), elapsed)
