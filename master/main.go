@@ -267,31 +267,25 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) error {
 			fmt.Printf("Pusher completed with status: %s\n", resp.Status)
 		}
 
+		body, err := io.Copy(ioutil.Discard, resp.Body)
+		if err != nil {
+			fmt.Printf("Pusher error: %s\n", err.Error())
+			resp.Body.Close()
+			return err
+		}
+		resp.Body.Close()
+
 		if resp.StatusCode == 429 {
 			fmt.Printf("Pusher was rate limited. Sleeping for 15 seconds\n")
 			time.Sleep(15 * time.Second)
-			resp.Body.Close()
 			continue
 		}
 
 		if resp.StatusCode != http.StatusOK {
 			fmt.Printf("Pusher error, got invalid response code: %s\n", resp.Status)
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				fmt.Printf("Unable to read response body: %s\n", err.Error())
-			}
 			fmt.Printf("Got response body: %s\n", body)
-
-			resp.Body.Close()
 			return err
 		}
-
-		if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
-			fmt.Printf("Pusher error: %s\n", err.Error())
-			resp.Body.Close()
-			continue
-		}
-		resp.Body.Close()
 
 		elapsed := time.Since(t0).Seconds()
 		fmt.Printf("Pusher sent %db in %.2fs\n", len(out), elapsed)
