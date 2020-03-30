@@ -189,7 +189,16 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 	}
 }
 
-func StatusPusher(nodes []NodeConfig, status *sync.Map) {
+func StatusPusherWrapper(nodes []NodeConfig, status *sync.Map) {
+	for {
+		err := StatusPusher(nodes, status)
+		if err != nil {
+			fmt.Printf("Restarting pusher due to: %s\n", err.Error())
+		}
+	}
+}
+
+func StatusPusher(nodes []NodeConfig, status *sync.Map) error {
 	tr := &http.Transport{
 		DialContext: (&net.Dialer{
 			Timeout:   5 * time.Second,
@@ -251,7 +260,7 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 		resp, err := client.Do(req)
 		if err != nil {
 			fmt.Printf("Pusher error: %s\n", err.Error())
-			continue
+			return err
 		}
 
 		if *debug {
@@ -274,7 +283,7 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 			fmt.Printf("Got response body: %s\n", body)
 
 			resp.Body.Close()
-			continue
+			return err
 		}
 
 		if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
@@ -307,7 +316,7 @@ func main() {
 	}
 
 	if *pusherEnable {
-		go StatusPusher(nodes, status)
+		go StatusPusherWrapper(nodes, status)
 	}
 
 	// Block here
