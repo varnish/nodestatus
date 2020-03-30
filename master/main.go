@@ -267,7 +267,7 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) error {
 			fmt.Printf("Pusher completed with status: %s\n", resp.Status)
 		}
 
-		body, err := io.Copy(ioutil.Discard, resp.Body)
+		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			fmt.Printf("Pusher error: %s\n", err.Error())
 			resp.Body.Close()
@@ -283,7 +283,7 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) error {
 
 		if resp.StatusCode != http.StatusOK {
 			fmt.Printf("Pusher error, got invalid response code: %s\n", resp.Status)
-			fmt.Printf("Got response body: %s\n", body)
+			fmt.Printf("Got response body: %s\n", string(body))
 			return err
 		}
 
