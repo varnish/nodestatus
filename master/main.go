@@ -10,7 +10,7 @@ import (
 	"gopkg.in/ini.v1"
 	"io"
 	"io/ioutil"
-	"log"
+	"fmt"
 	"math/rand"
 	"net"
 	"net/http"
@@ -71,10 +71,11 @@ type NodeConfig struct {
 }
 
 func readConfiguration(path *string, group *string) ([]NodeConfig, error) {
-	log.Println("Configuration file:", *path)
+	fmt.Printf("Configuration file: %s\n", *path)
 	cfgIni, err := ini.Load(*path)
 	if err != nil {
-		log.Fatal("Failed to read file:", err)
+		fmt.Printf("Failed to read file: %s\n", err.Error())
+		os.Exit(2)
 	}
 
 	var nodes []NodeConfig
@@ -117,7 +118,7 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 		t0 := time.Now()
 		req, err := http.NewRequest(http.MethodGet, node.Url, nil)
 		if err != nil {
-			log.Println("Puller for "+node.Name+" error:", err)
+			fmt.Printf("Puller for %s error: %s\n", node.Name, err.Error())
 			s.Reset()
 			s.Reason = "Unable to create request"
 			status.Store(node.Name, s)
@@ -127,7 +128,7 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 		req.Header.Set("Accept-Encoding", "gzip")
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Println("Puller for "+node.Name+" error:", err)
+			fmt.Printf("Puller for %s error: %s\n", node.Name, err.Error())
 			s.Reset()
 			s.Reason = "Unable to connect to node"
 			status.Store(node.Name, s)
@@ -135,7 +136,7 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 		}
 
 		if *debug {
-			log.Println("Puller for " + node.Name + " completed with status " + resp.Status)
+			fmt.Printf("Puller for %s completed with status %s\n", node.Name, resp.Status)
 		}
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusServiceUnavailable {
 			s.Reset()
@@ -150,7 +151,7 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 		case "gzip":
 			reader, err = gzip.NewReader(resp.Body)
 			if err != nil {
-				log.Println("Puller for "+node.Name+" failed to uncompress response:", err)
+				fmt.Printf("Puller for %s failed to uncompress response: %s\n", node.Name, err.Error())
 				s.Reset()
 				s.Reason = "Invalid response code (" + resp.Status + ")"
 				status.Store(node.Name, s)
@@ -163,7 +164,7 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 
 		body, err := ioutil.ReadAll(reader)
 		if err != nil {
-			log.Println("Puller for "+node.Name+" error:", err)
+			fmt.Printf("Puller for %s error: %s\n", node.Name, err.Error())
 			s.Reset()
 			s.Reason = "Unable to read response body"
 			status.Store(node.Name, s)
@@ -173,16 +174,16 @@ func StatusPuller(node NodeConfig, status *sync.Map) {
 		reader.Close()
 
 		elapsed := time.Since(t0).Seconds()
-		log.Printf("Puller for %s fetched %db in %.2fs\n", node.Name, len(body), elapsed)
+		fmt.Printf("Puller for %s fetched %db in %.2fs\n", node.Name, len(body), elapsed)
 		if err := json.Unmarshal(body, &s); err != nil {
-			log.Println("Puller for "+node.Name+" error:", err)
+			fmt.Printf("Puller for %s error: %s\n", node.Name, err.Error())
 			s.Reset()
 			s.Reason = "Unable to read status"
 			status.Store(node.Name, s)
 			continue
 		}
 		if *debug {
-			log.Println("Puller for " + node.Name + " got: " + string(body))
+			fmt.Printf("Puller for %s got: %s\n", node.Name, string(body))
 		}
 		status.Store(node.Name, s)
 	}
@@ -226,17 +227,17 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 
 		out, err := json.MarshalIndent(all, "", "    ")
 		if err != nil {
-			log.Println(err)
+			fmt.Printf("%s\n", err.Error())
 			continue
 		}
 		if *debug {
-			log.Println("Pusher will send " + string(out))
+			fmt.Printf("Pusher will send: %s\n", string(out))
 		}
 
 		t0 := time.Now()
 		req, err := http.NewRequest(http.MethodPost, *pusherUrl, bytes.NewBuffer(out))
 		if err != nil {
-			log.Println("Pusher error:", err)
+			fmt.Printf("Pusher error: %s\n", err.Error())
 			continue
 		}
 		req.Header.Set("User-Agent", "NodeStatusPusher/1.0.0")
@@ -249,42 +250,42 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Println("Pusher error:", err)
+			fmt.Printf("Pusher error: %s\n", err.Error())
 			continue
 		}
 
 		if *debug {
-			log.Println("Pusher completed with status " + resp.Status)
+			fmt.Printf("Pusher completed with status: %s\n", resp.Status)
 		}
 
 		if resp.StatusCode == 429 {
-			log.Println("Pusher was rate limited. Sleeping for 15 seconds")
+			fmt.Printf("Pusher was rate limited. Sleeping for 15 seconds\n")
 			time.Sleep(15 * time.Second)
 			resp.Body.Close()
 			continue
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			log.Println("Pusher error, got invalid response code:", resp.Status)
+			fmt.Printf("Pusher error, got invalid response code: %s\n", resp.Status)
 			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
-				log.Println("Unable to read response body:", err)
+				fmt.Printf("Unable to read response body: %s\n", err.Error())
 			}
-			log.Println("Got response body:", body)
+			fmt.Printf("Got response body: %s\n", body)
 
 			resp.Body.Close()
 			continue
 		}
 
 		if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
-			log.Println("Pusher error:", err)
+			fmt.Printf("Pusher error: %s\n", err.Error())
 			resp.Body.Close()
 			continue
 		}
 		resp.Body.Close()
 
 		elapsed := time.Since(t0).Seconds()
-		log.Printf("Pusher sent %db in %.2fs", len(out), elapsed)
+		fmt.Printf("Pusher sent %db in %.2fs\n", len(out), elapsed)
 	}
 }
 
@@ -296,7 +297,8 @@ func main() {
 
 	nodes, err := readConfiguration(cfgFile, group)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Printf(err.Error())
+		os.Exit(2)
 	}
 
 	status := new(sync.Map)
