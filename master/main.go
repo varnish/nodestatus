@@ -265,7 +265,13 @@ func StatusPusher(nodes []NodeConfig, status *sync.Map) {
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			log.Println("Pusher error, got invalid response code:", resp.StatusCode)
+			log.Println("Pusher error, got invalid response code:", resp.Status)
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				log.Println("Unable to read response body:", err)
+			}
+			log.Println("Got response body:", body)
+
 			resp.Body.Close()
 			continue
 		}
