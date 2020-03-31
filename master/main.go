@@ -46,8 +46,8 @@ type NodeStatus struct {
 	Load5          float64 `json:"load5,omitempty"`
 	Load15         float64 `json:"load15,omitempty"`
 	Net            string  `json:"net,omitempty"`
-	NetThreshold   string  `json:"net-threshold,omitempty"`
-	NetUtilization uint64  `json:"net-utilization,omitempty"`
+	NetThreshold   string  `json:"net-threshold"`
+	NetUtilization uint64  `json:"net-utilization"`
 	Time           int64   `json:"time,omitempty"`
 	Uptime         int     `json:"uptime,omitempty"`
 	Name           string  `json:"name"`
